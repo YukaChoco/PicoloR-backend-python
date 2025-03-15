@@ -1,2 +1,4 @@
 # falcon
 falcon==4.0.2
+# pillow
+Pillow==11.1.0
