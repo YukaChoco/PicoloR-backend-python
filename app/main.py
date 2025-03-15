@@ -181,7 +181,7 @@ class AppResource(object):
                 SELECT COALESCE(color_count.count, 0) + 1 AS rank
                 FROM color_count
             """, (color_id,))
-            
+
             # rankを取得
             rank = cursor.fetchone()
             return rank[0] if rank else 1  # rankが無ければ1を返す
@@ -189,9 +189,20 @@ class AppResource(object):
     def insert_to_db(self, user_id, color_id, image_base64, posted_time, rank):
         with self.connection.cursor() as cursor:
             cursor.execute("""
+                SELECT COUNT(*) FROM posts WHERE color_id = %s
+            """, (color_id,))
+            result = cursor.fetchone()
+            if result is None:
+                raise ValueError("Failed to fetch the count from the database")
+
+            can_post = result[0] == 0
+            if not can_post:
+                raise ValueError("This color is already posted")
+
+            cursor.execute("""
                 INSERT INTO posts (user_id, color_id, image, posted_time, rank) 
                 VALUES (%s, %s, %s, %s, %s)
-            """, (user_id, color_id, image_base64, posted_time, rank))
+            """, (user_id, color_id, image_base64, posted_time, rank,))
 
             self.connection.commit()
 
