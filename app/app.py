@@ -37,16 +37,11 @@ class AppResource(object):
             input_hue = self.hex_to_hue(color)
 
             # 画像をHSV空間に変換し、条件を満たすピクセルのHueの平均値を計算
-            average_hue = self.get_average_hue(image)
-
-            # 引数のカラーコードのHueと平均Hueを比較
-            is_success = abs(input_hue - average_hue) <= 20
+            is_success = self.check_image_hue(image, input_hue)
 
             # 成功レスポンス
             resp.media = {
-                "is_success": "true" if is_success else "false",
-                "input_hue": input_hue,
-                "average_hue": average_hue
+                "is_success": "true" if is_success else "false"
             }
             resp.status = falcon.HTTP_200
         except json.JSONDecodeError:
@@ -66,22 +61,31 @@ class AppResource(object):
         hsv = colorsys.rgb_to_hsv(rgb[0]/255.0, rgb[1]/255.0, rgb[2]/255.0)
         return hsv[0] * 360  # Hueを0-360の範囲に変換
 
-    def get_average_hue(self, image):
+    def check_image_hue(self, image, input_hue):
         # 画像をRGBからHSVに変換
         image = image.convert('RGB')
         np_image = np.array(image)
         hsv_image = np.apply_along_axis(lambda x: colorsys.rgb_to_hsv(x[0]/255.0, x[1]/255.0, x[2]/255.0), 2, np_image)
         
-        # S >= 0.6 かつ V >= 0.7 のピクセルを抽出
-        mask = (hsv_image[:,:,1] >= 0.6) & (hsv_image[:,:,2] >= 0.7)
+        # S >= 0.3 かつ V >= 0.3 のピクセルを抽出
+        mask = (hsv_image[:,:,1] >= 0.3) & (hsv_image[:,:,2] >= 0.3)
         filtered_hues = hsv_image[:,:,0][mask] * 360  # Hueを0-360の範囲に変換
 
-        if len(filtered_hues) == 0:
-            raise ValueError("No pixels meet the criteria")
+        # 条件2: ピックアップした画素が全体の15%以上を占めているか
+        total_pixels = np_image.shape[0] * np_image.shape[1]
+        print(len(filtered_hues)/total_pixels)
+        if len(filtered_hues) < 0.15 * total_pixels:
+            return False
 
-        # Hueの平均値を計算
-        average_hue = np.mean(filtered_hues)
-        return average_hue
+        # 条件1: ピックアップした画素のうちHueが前後20の範囲にあるものの占有率を調べ、70%以上であること
+        hue_range_mask = ((filtered_hues >= input_hue - 20) & (filtered_hues <= input_hue + 20)) | \
+                         ((filtered_hues + 360 >= input_hue - 20) & (filtered_hues + 360 <= input_hue + 20)) | \
+                         ((filtered_hues - 360 >= input_hue - 20) & (filtered_hues - 360 <= input_hue + 20))
+        print(np.sum(hue_range_mask)/len(filtered_hues))
+        if np.sum(hue_range_mask) < 0.7 * len(filtered_hues):
+            return False
+
+        return True
 
 app = falcon.App()
 app.add_route("/", AppResource())
