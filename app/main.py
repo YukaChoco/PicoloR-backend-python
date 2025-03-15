@@ -58,7 +58,6 @@ class AppResource(object):
                 if user_id is None or color_id is None or image_base64 is None:
                     raise ValueError("Missing required fields")
 
-                color = "0AC74F"
                 # 日本時間の現在時間を取得(日本時間)
                 posted_at = datetime.datetime.now()
                 start_at = self.get_start_at(color_id)
@@ -69,6 +68,9 @@ class AppResource(object):
                 # Base64エンコードされた画像データをデコードしてPillowで読み込む
                 image_data = io.BytesIO(base64.b64decode(image_base64))
                 image = Image.open(image_data)
+
+                # テスト用のカラーコード
+                color = self.get_theme_color(color_id)
 
                 # 入力カラーコードをHSV空間に変換し、Hueを取り出す
                 input_hue = self.hex_to_hue(color)
@@ -115,6 +117,17 @@ class AppResource(object):
         elapsed_time = posted_at - start_at
         minutes, seconds = divmod(int(elapsed_time.total_seconds()), 60)
         return f"{minutes}:{seconds:02d}"
+
+    def get_theme_color(self, color_id):
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT color FROM room_colors WHERE id = %s",
+                (color_id,)
+            )
+            result = cursor.fetchall()
+            if len(result) == 0:
+                raise ValueError("Color not found")
+            return result[0][0]
 
     def hex_to_hue(self, hex_color):
         # 16進数カラーコードをRGBに変換
