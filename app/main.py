@@ -79,12 +79,18 @@ class AppResource(object):
                 is_success = self.check_image_hue(image, input_hue)
 
                 # DBにPostgresqlでデータを追加
-                self.insert_to_db(user_id, color_id, image_base64, posted_time)
+                if is_success:
+                    self.insert_to_db(user_id, color_id, image_base64, posted_time)
+                    resp.media = {
+                        "is_success": True,
+                        "rank": 10
+                    }
+                else:
+                    resp.media = {
+                        "is_success": False,
+                    }
 
                 # 成功レスポンス
-                resp.media = {
-                    "is_success": True if is_success else False
-                }
                 resp.status = falcon.HTTP_200
             else:
                 # raw_jsonがNoneまたは空の場合の処理
@@ -142,7 +148,7 @@ class AppResource(object):
         image = image.convert('RGB')
         np_image = np.array(image)
         hsv_image = np.apply_along_axis(lambda x: colorsys.rgb_to_hsv(x[0]/255.0, x[1]/255.0, x[2]/255.0), 2, np_image)
-        
+
         # S >= 0.3 かつ V >= 0.3 のピクセルを抽出
         mask = (hsv_image[:,:,1] >= 0.3) & (hsv_image[:,:,2] >= 0.3)
         filtered_hues = hsv_image[:,:,0][mask] * 360  # Hueを0-360の範囲に変換
