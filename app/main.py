@@ -62,7 +62,7 @@ class AppResource(object):
                 # 日本時間の現在時間を取得(日本時間)
                 posted_at = datetime.datetime.now()
 
-                start_at = self.get_start_at()
+                start_at = self.get_start_at(color_id)
                 if start_at is None:
                     raise ValueError("Room not found")
                 # start_atがタイムゾーン情報を持っている場合、削除する
@@ -108,11 +108,11 @@ class AppResource(object):
             resp.text = json.dumps({"error": str(e)})
             resp.status = falcon.HTTP_500
 
-    def get_start_at(self):
+    def get_start_at(self, color_id):
         with self.connection.cursor() as cursor:
             cursor.execute(
-                "SELECT start_at FROM rooms WHERE id = %s",
-                (1,)
+                "SELECT start_at FROM room_colors INNER JOIN rooms ON room_colors.room_id = rooms.id WHERE room_colors.id = %s",
+                (color_id,)
             )
             result = cursor.fetchall()
             if len(result) == 0:
