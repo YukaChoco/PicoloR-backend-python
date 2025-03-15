@@ -175,7 +175,7 @@ class AppResource(object):
             cursor.execute("""
                 WITH color_count AS (
                     SELECT COUNT(*) AS count
-                    FROM posts 
+                    FROM posts
                     WHERE color_id = %s
                 )
                 SELECT COALESCE(color_count.count, 0) + 1 AS rank
@@ -183,8 +183,13 @@ class AppResource(object):
             """, (color_id,))
 
             # rankを取得
-            rank = cursor.fetchone()
-            return rank[0] if rank else 1  # rankが無ければ1を返す
+            current_winner_count = cursor.fetchone()
+            print("current_winner_count",current_winner_count)
+            if current_winner_count is None:
+                raise ValueError("Failed to fetch the current winner count from the database")
+            next_rank = current_winner_count[0] + 1
+            print("next_rank",next_rank)
+            return next_rank
 
     def insert_to_db(self, user_id, color_id, image_base64, posted_time, rank):
         with self.connection.cursor() as cursor:
@@ -207,7 +212,7 @@ class AppResource(object):
             self.connection.commit()
 
 app = falcon.App()
-app.add_route("/", AppResource(db_config))
+app.add_route("/controller/image", AppResource(db_config))
 
 if __name__ == "__main__":
     from wsgiref import simple_server
