@@ -1,3 +1,4 @@
+import datetime
 import json
 import falcon
 from PIL import Image
@@ -58,7 +59,24 @@ class AppResource(object):
                     raise ValueError("Missing required fields")
 
                 color = "0AC74F"
-                posted_at = "2021-09-01 00:00:00"
+                # 日本時間の現在時間を取得(日本時間)
+                posted_at = datetime.datetime.now()
+
+                start_at = self.get_start_at()
+                if start_at is None:
+                    raise ValueError("Room not found")
+                # start_atがタイムゾーン情報を持っている場合、削除する
+                if start_at.tzinfo is not None:
+                    start_at = start_at.replace(tzinfo=None)
+
+                # 経過時間を計算
+                elapsed_time = posted_at - start_at
+
+                # 分数:秒数に変換
+                minutes, seconds = divmod(int(elapsed_time.total_seconds()), 60)
+
+                # 結果をテキストとしてフォーマット
+                posted_time = f"{minutes}:{seconds:02d}"
 
                 # Base64エンコードされた画像データをデコードしてPillowで読み込む
                 image_data = io.BytesIO(base64.b64decode(image_base64))
@@ -71,7 +89,7 @@ class AppResource(object):
                 is_success = self.check_image_hue(image, input_hue)
 
                 # DBにPostgresqlでデータを追加
-                self.insert_to_db(user_id, color_id, image_base64, posted_at)
+                self.insert_to_db(user_id, color_id, image_base64, posted_time)
 
                 # 成功レスポンス
                 resp.media = {
@@ -89,6 +107,17 @@ class AppResource(object):
             print(f"Error: {str(e)}")
             resp.text = json.dumps({"error": str(e)})
             resp.status = falcon.HTTP_500
+
+    def get_start_at(self):
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT start_at FROM rooms WHERE id = %s",
+                (1,)
+            )
+            result = cursor.fetchall()
+            if len(result) == 0:
+                return None
+            return result[0][0]
 
     def hex_to_hue(self, hex_color):
         # 16進数カラーコードをRGBに変換
@@ -110,7 +139,7 @@ class AppResource(object):
 
         # 条件2: ピックアップした画素が全体の15%以上を占めているか
         total_pixels = np_image.shape[0] * np_image.shape[1]
-        print(len(filtered_hues)/total_pixels)
+        print("pixel ratio",len(filtered_hues)/total_pixels)
         if len(filtered_hues) < 0.15 * total_pixels:
             return False
 
@@ -118,17 +147,17 @@ class AppResource(object):
         hue_range_mask = ((filtered_hues >= input_hue - 20) & (filtered_hues <= input_hue + 20)) | \
                          ((filtered_hues + 360 >= input_hue - 20) & (filtered_hues + 360 <= input_hue + 20)) | \
                          ((filtered_hues - 360 >= input_hue - 20) & (filtered_hues - 360 <= input_hue + 20))
-        print(np.sum(hue_range_mask)/len(filtered_hues))
+        print("hue ratio", np.sum(hue_range_mask)/len(filtered_hues))
         if np.sum(hue_range_mask) < 0.7 * len(filtered_hues):
             return False
 
         return True
 
-    def insert_to_db(self, user_id, color_id, image_base64, posted_at):
+    def insert_to_db(self, user_id, color_id, image_base64, posted_time):
         with self.connection.cursor() as cursor:
             cursor.execute(
-                "INSERT INTO posts (user_id, color_id, image, posted_at, rank) VALUES (%s, %s, %s, %s, 4)",
-                (user_id, color_id, image_base64, posted_at)
+                "INSERT INTO posts (user_id, color_id, image, posted_time, rank) VALUES (%s, %s, %s, %s, 4)",
+                (user_id, color_id, image_base64, posted_time)
             )
             self.connection.commit()
 
