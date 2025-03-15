@@ -211,8 +211,80 @@ class AppResource(object):
 
             self.connection.commit()
 
+class ThemeColorResource(object):
+    def __init__(self,db_config:DbConfig) ->None:
+        self.connection = psycopg2.connect(
+            dbname=db_config.dbname,
+            user=db_config.user,
+            password=db_config.password,
+            host=db_config.host,
+            port=db_config.port
+        )
+
+    def on_get(self, req, resp):
+        try:
+            raw_json = req.bounded_stream.read()
+            if raw_json is not None and raw_json:
+                # raw_jsonがNoneでなく、かつ空でない場合の処理
+                data = json.loads(raw_json)
+                room_id = data.get("roomID")
+
+                if room_id is None:
+                    raise ValueError("Missing required fields")
+
+                user_count = self.get_user_count(room_id)
+                theme_colors = self.get_theme_colors(user_count)
+
+                # 成功レスポンス
+                resp.media = {
+                    "themeColors": theme_colors
+                }
+                resp.status = falcon.HTTP_200
+            else:
+                # raw_jsonがNoneまたは空の場合の処理
+                raise ValueError("Empty request body")
+        except json.JSONDecodeError:
+            resp.text = json.dumps({"error": "Invalid JSON"})
+            resp.status = falcon.HTTP_400
+        except Exception as e:
+            # 詳細なエラーメッセージをログに出力
+            print(f"Error: {str(e)}")
+            resp.text = json.dumps({"error": str(e)})
+            resp.status = falcon.HTTP_500
+
+    def get_user_count(self, room_id):
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT COUNT(*) FROM room_members WHERE room_id = %s",
+                (room_id,)
+            )
+            result = cursor.fetchall()
+            if len(result) == 0:
+                raise ValueError("Room not found")
+            if result[0][0] < 2:
+                raise ValueError("Room has not enough members")
+            return result[0][0]
+
+    def get_theme_colors(self, user_count):
+        # ランダムでテーマカラーを生成
+        theme_colors = []
+        theme_hues = []
+        first_color_hue = np.random.rand()
+        theme_hues.append(first_color_hue)
+        if user_count == 3:
+            theme_hues.append((first_color_hue - 0.4) % 1)
+        elif user_count >= 4:
+            theme_hues.append((first_color_hue - 0.4) % 1)
+            theme_hues.append((first_color_hue + 0.3) % 1)
+        for hue in theme_hues:
+            rgb = colorsys.hsv_to_rgb(hue, 1, 1)
+            hex_color = '#%02x%02x%02x' % tuple(int(x * 255) for x in rgb)
+            theme_colors.append(hex_color)
+        return theme_colors
+
 app = falcon.App()
 app.add_route("/controller/image", AppResource(db_config))
+app.add_route("/host/theme_color", ThemeColorResource(db_config))
 
 if __name__ == "__main__":
     from wsgiref import simple_server
