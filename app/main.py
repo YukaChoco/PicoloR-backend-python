@@ -61,22 +61,10 @@ class AppResource(object):
                 color = "0AC74F"
                 # 日本時間の現在時間を取得(日本時間)
                 posted_at = datetime.datetime.now()
-
                 start_at = self.get_start_at(color_id)
-                if start_at is None:
-                    raise ValueError("Room not found")
-                # start_atがタイムゾーン情報を持っている場合、削除する
-                if start_at.tzinfo is not None:
-                    start_at = start_at.replace(tzinfo=None)
-
-                # 経過時間を計算
-                elapsed_time = posted_at - start_at
-
-                # 分数:秒数に変換
-                minutes, seconds = divmod(int(elapsed_time.total_seconds()), 60)
 
                 # 結果をテキストとしてフォーマット
-                posted_time = f"{minutes}:{seconds:02d}"
+                posted_time = self.get_posted_time(start_at, posted_at)
 
                 # Base64エンコードされた画像データをデコードしてPillowで読み込む
                 image_data = io.BytesIO(base64.b64decode(image_base64))
@@ -116,8 +104,17 @@ class AppResource(object):
             )
             result = cursor.fetchall()
             if len(result) == 0:
-                return None
+                raise ValueError("Room not found")
+            if result[0][0] is None:
+                raise ValueError("Room has not started yet")
             return result[0][0]
+
+    def get_posted_time(self, start_at, posted_at):
+        if start_at.tzinfo is not None:
+            start_at = start_at.replace(tzinfo=None)
+        elapsed_time = posted_at - start_at
+        minutes, seconds = divmod(int(elapsed_time.total_seconds()), 60)
+        return f"{minutes}:{seconds:02d}"
 
     def hex_to_hue(self, hex_color):
         # 16進数カラーコードをRGBに変換
