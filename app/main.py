@@ -80,10 +80,11 @@ class AppResource(object):
 
                 # DBにPostgresqlでデータを追加
                 if is_success:
-                    self.insert_to_db(user_id, color_id, image_base64, posted_time)
+                    rank = self.get_rank_for_color_id(color_id)  # rankを取得
+                    self.insert_to_db(user_id, color_id, image_base64, posted_time, rank)
                     resp.media = {
                         "is_success": True,
-                        "rank": 10
+                        "rank": rank
                     }
                 else:
                     resp.media = {
@@ -169,12 +170,29 @@ class AppResource(object):
 
         return True
 
-    def insert_to_db(self, user_id, color_id, image_base64, posted_time):
+    def get_rank_for_color_id(self, color_id):
         with self.connection.cursor() as cursor:
-            cursor.execute(
-                "INSERT INTO posts (user_id, color_id, image, posted_time, rank) VALUES (%s, %s, %s, %s, 4)",
-                (user_id, color_id, image_base64, posted_time)
-            )
+            cursor.execute("""
+                WITH color_count AS (
+                    SELECT COUNT(*) AS count
+                    FROM posts 
+                    WHERE color_id = %s
+                )
+                SELECT COALESCE(color_count.count, 0) + 1 AS rank
+                FROM color_count
+            """, (color_id,))
+            
+            # rankを取得
+            rank = cursor.fetchone()
+            return rank[0] if rank else 1  # rankが無ければ1を返す
+
+    def insert_to_db(self, user_id, color_id, image_base64, posted_time, rank):
+        with self.connection.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO posts (user_id, color_id, image, posted_time, rank) 
+                VALUES (%s, %s, %s, %s, %s)
+            """, (user_id, color_id, image_base64, posted_time, rank))
+
             self.connection.commit()
 
 app = falcon.App()
