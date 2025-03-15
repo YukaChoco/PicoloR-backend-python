@@ -3,6 +3,8 @@ import falcon
 from PIL import Image
 import io
 import base64
+import colorsys
+import numpy as np
 
 class AppResource(object):
 
@@ -31,13 +33,20 @@ class AppResource(object):
             image_data = io.BytesIO(base64.b64decode(photo))
             image = Image.open(image_data)
 
-            # 画像の色を判定する処理（簡単な例として、画像の色をチェックする）
-            is_color_match = self.check_image_color(image, color)
+            # 入力カラーコードをHSV空間に変換し、Hueを取り出す
+            input_hue = self.hex_to_hue(color)
+
+            # 画像をHSV空間に変換し、条件を満たすピクセルのHueの平均値を計算
+            average_hue = self.get_average_hue(image)
+
+            # 引数のカラーコードのHueと平均Hueを比較
+            is_success = abs(input_hue - average_hue) <= 20
 
             # 成功レスポンス
             resp.media = {
-                "is_success": "true" if is_color_match else "false",
-                "rank": 1 if is_color_match else 0
+                "is_success": "true" if is_success else "false",
+                "input_hue": input_hue,
+                "average_hue": average_hue
             }
             resp.status = falcon.HTTP_200
         except json.JSONDecodeError:
@@ -49,15 +58,30 @@ class AppResource(object):
             resp.text = json.dumps({"error": str(e)})
             resp.status = falcon.HTTP_500
 
-    def check_image_color(self, image, color):
-        # 簡単な色判定例（画像の中央ピクセルを判定）
-        width, height = image.size
-        central_pixel = image.getpixel((width // 2, height // 2))
+    def hex_to_hue(self, hex_color):
+        # 16進数カラーコードをRGBに変換
+        hex_color = hex_color.lstrip('#')
+        rgb = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+        # RGBをHSVに変換
+        hsv = colorsys.rgb_to_hsv(rgb[0]/255.0, rgb[1]/255.0, rgb[2]/255.0)
+        return hsv[0] * 360  # Hueを0-360の範囲に変換
 
-        # 色の判定（単純な例: RGB の一致）
-        if color == "red" and central_pixel[0] > central_pixel[1] and central_pixel[0] > central_pixel[2]:
-            return True
-        return False
+    def get_average_hue(self, image):
+        # 画像をRGBからHSVに変換
+        image = image.convert('RGB')
+        np_image = np.array(image)
+        hsv_image = np.apply_along_axis(lambda x: colorsys.rgb_to_hsv(x[0]/255.0, x[1]/255.0, x[2]/255.0), 2, np_image)
+        
+        # S >= 0.6 かつ V >= 0.7 のピクセルを抽出
+        mask = (hsv_image[:,:,1] >= 0.6) & (hsv_image[:,:,2] >= 0.7)
+        filtered_hues = hsv_image[:,:,0][mask] * 360  # Hueを0-360の範囲に変換
+
+        if len(filtered_hues) == 0:
+            raise ValueError("No pixels meet the criteria")
+
+        # Hueの平均値を計算
+        average_hue = np.mean(filtered_hues)
+        return average_hue
 
 app = falcon.App()
 app.add_route("/", AppResource())

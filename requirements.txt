@@ -2,3 +2,5 @@
 falcon==4.0.2
 # pillow
 Pillow==11.1.0
+# numpy
+numpy==2.2.3
