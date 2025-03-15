@@ -52,17 +52,16 @@ class AppResource(object):
                 data = json.loads(raw_json)
                 user_id = data.get("userID")
                 color_id = data.get("colorID")
-                posted_at = data.get("postedAt")
-                image = data.get("image")
-                print(user_id, color_id, posted_at)
+                image_base64 = data.get("image")
 
-                if user_id is None or color_id is None or posted_at is None or image is None:
+                if user_id is None or color_id is None or image_base64 is None:
                     raise ValueError("Missing required fields")
 
                 color = "0AC74F"
+                posted_at = "2021-09-01 00:00:00"
 
                 # Base64エンコードされた画像データをデコードしてPillowで読み込む
-                image_data = io.BytesIO(base64.b64decode(image))
+                image_data = io.BytesIO(base64.b64decode(image_base64))
                 image = Image.open(image_data)
 
                 # 入力カラーコードをHSV空間に変換し、Hueを取り出す
@@ -72,7 +71,7 @@ class AppResource(object):
                 is_success = self.check_image_hue(image, input_hue)
 
                 # DBにPostgresqlでデータを追加
-                self.insert_to_db(user_id, color_id, image, posted_at)
+                self.insert_to_db(user_id, color_id, image_base64, posted_at)
 
                 # 成功レスポンス
                 resp.media = {
@@ -125,10 +124,11 @@ class AppResource(object):
 
         return True
 
-    def insert_to_db(self, user_id, color_id, image, posted_at):
+    def insert_to_db(self, user_id, color_id, image_base64, posted_at):
         with self.connection.cursor() as cursor:
             cursor.execute(
-                "INSERT INTO posts (user_id, color_id, image, posted_at, rank) VALUES (1, 1, 1, 123, 3)"
+                "INSERT INTO posts (user_id, color_id, image, posted_at, rank) VALUES (%s, %s, %s, %s, 4)",
+                (user_id, color_id, image_base64, posted_at)
             )
             self.connection.commit()
 
