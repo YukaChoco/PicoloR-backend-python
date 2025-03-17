@@ -247,13 +247,14 @@ class ThemeColorResource(object):
                 user_count = self.get_user_count(room_id)
                 theme_colors = self.get_theme_colors(user_count)
 
+                self.insert_to_db(room_id, theme_colors)
+
                 # 成功レスポンス
                 resp.media = {
                     "themeColors": theme_colors
                 }
                 resp.status = falcon.HTTP_200
             else:
-                # raw_jsonがNoneまたは空の場合の処理
                 raise ValueError("Empty request body")
         except json.JSONDecodeError:
             resp.text = json.dumps({"error": "Invalid JSON"})
@@ -293,6 +294,16 @@ class ThemeColorResource(object):
             hex_color = '#%02x%02x%02x' % tuple(int(x * 255) for x in rgb)
             theme_colors.append(hex_color)
         return theme_colors
+
+    def insert_to_db(self, room_id, colors):
+        with self.connection.cursor() as cursor:
+            for color in colors:
+                cursor.execute("""
+                    INSERT INTO room_colors (room_id, color)
+                    VALUES (%s, %s)
+                """, (room_id, color,))
+
+            self.connection.commit()
 
 app = falcon.App(middleware=[CORSMiddleware()])
 app.add_route("/controller/image", AppResource(db_config))
