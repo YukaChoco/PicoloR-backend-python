@@ -19,6 +19,7 @@ idna==3.10
 load-dotenv==0.1.0
 multidict==6.1.0
 numpy==2.2.3
+opencv-python==4.11.0.86
 packaging==24.2
 pillow==11.1.0
 postgrest==0.19.3

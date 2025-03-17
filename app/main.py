@@ -8,6 +8,7 @@ import colorsys
 import numpy as np
 import psycopg2
 import os
+import cv2
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from sqlalchemy import create_engine, text
@@ -137,34 +138,33 @@ class AppResource(object):
             return result[0][0]
 
     def hex_to_hue(self, hex_color):
-        # 16進数カラーコードをRGBに変換
+        # 16進数カラーコードをHSVに変換
         hex_color = hex_color.lstrip('#')
-        rgb = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-        # RGBをHSVに変換
-        hsv = colorsys.rgb_to_hsv(rgb[0]/255.0, rgb[1]/255.0, rgb[2]/255.0)
+        hsv = colorsys.rgb_to_hsv(int(hex_color[:2], 16) / 255, int(hex_color[2:4], 16) / 255, int(hex_color[4:], 16) / 255)
         return hsv[0] * 360  # Hueを0-360の範囲に変換
 
     def check_image_hue(self, image, input_hue):
         # 画像をRGBからHSVに変換
         image = image.convert('RGB')
         np_image = np.array(image)
-        hsv_image = np.apply_along_axis(lambda x: colorsys.rgb_to_hsv(x[0]/255.0, x[1]/255.0, x[2]/255.0), 2, np_image)
+        hsv_image = cv2.cvtColor(np_image, cv2.COLOR_RGB2HSV)
 
         # S >= 0.3 かつ V >= 0.3 のピクセルを抽出
-        mask = (hsv_image[:,:,1] >= 0.3) & (hsv_image[:,:,2] >= 0.3)
-        filtered_hues = hsv_image[:,:,0][mask] * 360  # Hueを0-360の範囲に変換
+        mask = (hsv_image[:,:,1] >= 0.3 * 255) & (hsv_image[:,:,2] >= 0.3 * 255)
+        filtered_hues = hsv_image[:,:,0][mask]  # Hueを0-360の範囲に変換
 
         # 条件2: ピックアップした画素が全体の15%以上を占めているか
         total_pixels = np_image.shape[0] * np_image.shape[1]
-        print("pixel ratio",len(filtered_hues)/total_pixels)
+        print("pixel ratio", len(filtered_hues) / total_pixels)
         if len(filtered_hues) < 0.15 * total_pixels:
             return False
 
         # 条件1: ピックアップした画素のうちHueが前後20の範囲にあるものの占有率を調べ、70%以上であること
-        hue_range_mask = ((filtered_hues >= input_hue - 20) & (filtered_hues <= input_hue + 20)) | \
-                         ((filtered_hues + 360 >= input_hue - 20) & (filtered_hues + 360 <= input_hue + 20)) | \
-                         ((filtered_hues - 360 >= input_hue - 20) & (filtered_hues - 360 <= input_hue + 20))
-        print("hue ratio", np.sum(hue_range_mask)/len(filtered_hues))
+        input_hue = input_hue / 2  # OpenCVのHueは0-180の範囲
+        hue_range_mask = ((filtered_hues >= input_hue - 10) & (filtered_hues <= input_hue + 10)) | \
+                        ((filtered_hues + 180 >= input_hue - 10) & (filtered_hues + 180 <= input_hue + 10)) | \
+                        ((filtered_hues - 180 >= input_hue - 10) & (filtered_hues - 180 <= input_hue + 10))
+        print("hue ratio", np.sum(hue_range_mask) / len(filtered_hues))
         if np.sum(hue_range_mask) < 0.7 * len(filtered_hues):
             return False
 
