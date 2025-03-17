@@ -176,7 +176,7 @@ class AppResource(object):
                         ((filtered_hues + 180 >= input_hue - 10) & (filtered_hues + 180 <= input_hue + 10)) | \
                         ((filtered_hues - 180 >= input_hue - 10) & (filtered_hues - 180 <= input_hue + 10))
         print("hue ratio", np.sum(hue_range_mask) / len(filtered_hues))
-        if np.sum(hue_range_mask) < 0.7 * len(filtered_hues):
+        if np.sum(hue_range_mask) < 0.4 * len(filtered_hues):
             return False
 
         return True
