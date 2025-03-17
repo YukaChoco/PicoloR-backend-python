@@ -35,6 +35,18 @@ if not all([dbname, user, password, host, port]):
 
 db_config = DbConfig(dbname=dbname, user=user, password=password, host=host, port=port)
 
+
+class CORSMiddleware:
+    def process_request(self, req, resp):
+        resp.set_header('Access-Control-Allow-Origin', '*')
+        resp.set_header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+        resp.set_header('Access-Control-Allow-Headers', 'Content-Type')
+
+    def process_response(self, req, resp, resource, req_succeeded):
+        resp.set_header('Access-Control-Allow-Origin', '*')
+        resp.set_header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+        resp.set_header('Access-Control-Allow-Headers', 'Content-Type')
+
 class AppResource(object):
     def __init__(self,db_config:DbConfig) ->None:
         self.connection = psycopg2.connect(
@@ -282,7 +294,7 @@ class ThemeColorResource(object):
             theme_colors.append(hex_color)
         return theme_colors
 
-app = falcon.App()
+app = falcon.App(middleware=[CORSMiddleware()])
 app.add_route("/controller/image", AppResource(db_config))
 app.add_route("/host/theme_color", ThemeColorResource(db_config))
 
