@@ -107,24 +107,17 @@ class AppResource(object):
             resp.status = falcon.HTTP_500
 
     def get_start_at(self, color_id):
-        try:
-            with self.connection.cursor() as cursor:
-                cursor.execute(
-                    "SELECT start_at FROM room_colors INNER JOIN rooms ON room_colors.room_id = rooms.id WHERE room_colors.id = %s",
-                    (color_id,)
-                )
-                result = cursor.fetchall()
-                if len(result) == 0:
-                    raise ValueError("Room not found")
-                if result[0][0] is None:
-                    raise ValueError("Room has not started yet")
-                self.connection.commit()
-                return result[0][0]
-        except Exception as e:
-            self.connection.rollback()  # エラー時にロールバック
-            raise e
-        finally:
-            self.connection.close()
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT start_at FROM room_colors INNER JOIN rooms ON room_colors.room_id = rooms.id WHERE room_colors.id = %s",
+                (color_id,)
+            )
+            result = cursor.fetchall()
+            if len(result) == 0:
+                raise ValueError("Room not found")
+            if result[0][0] is None:
+                raise ValueError("Room has not started yet")
+            return result[0][0]
 
 
     def get_posted_time(self, start_at, posted_at):
@@ -135,22 +128,15 @@ class AppResource(object):
         return f"{minutes}:{seconds:02d}"
 
     def get_theme_color(self, color_id):
-        try:
-            with self.connection.cursor() as cursor:
-                cursor.execute(
-                    "SELECT color FROM room_colors WHERE id = %s",
-                    (color_id,)
-                )
-                result = cursor.fetchall()
-                if len(result) == 0:
-                    raise ValueError("Color not found")
-                self.connection.commit()
-                return result[0][0]
-        except Exception as e:
-            self.connection.rollback()  # エラー時にロールバック
-            raise e
-        finally:
-            self.connection.close()
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT color FROM room_colors WHERE id = %s",
+                (color_id,)
+            )
+            result = cursor.fetchall()
+            if len(result) == 0:
+                raise ValueError("Color not found")
+            return result[0][0]
 
     def hex_to_hue(self, hex_color):
         # 16進数カラーコードをHSVに変換
@@ -186,57 +172,43 @@ class AppResource(object):
         return True
 
     def get_rank_for_color_id(self, color_id):
-        try:
-            with self.connection.cursor() as cursor:
-                cursor.execute("""
-                    WITH color_count AS (
-                        SELECT COUNT(*) AS count
-                        FROM posts
-                        WHERE color_id = %s
-                    )
-                    SELECT COALESCE(color_count.count, 0) + 1 AS rank
-                    FROM color_count
-                """, (color_id,))
+        with self.connection.cursor() as cursor:
+            cursor.execute("""
+                WITH color_count AS (
+                    SELECT COUNT(*) AS count
+                    FROM posts
+                    WHERE color_id = %s
+                )
+                SELECT COALESCE(color_count.count, 0) + 1 AS rank
+                FROM color_count
+            """, (color_id,))
 
-                # rankを取得
-                current_winner_count = cursor.fetchone()
-                print("current_winner_count",current_winner_count)
-                if current_winner_count is None:
-                    raise ValueError("Failed to fetch the current winner count from the database")
-                next_rank = current_winner_count[0] + 1
-                print("next_rank",next_rank)
-                return next_rank
-        except Exception as e:
-            self.connection.rollback()  # エラー時にロールバック
-            raise e
-        finally:
-            self.connection.close()
+            # rankを取得
+            current_winner_count = cursor.fetchone()
+            print("current_winner_count",current_winner_count)
+            if current_winner_count is None:
+                raise ValueError("Failed to fetch the current winner count from the database")
+            next_rank = current_winner_count[0] + 1
+            print("next_rank",next_rank)
+            return next_rank
 
     def insert_to_db(self, user_id, color_id, image_base64, posted_time, rank):
-        try:
-            with self.connection.cursor() as cursor:
-                cursor.execute("""
-                    SELECT COUNT(*) FROM posts WHERE color_id = %s
-                """, (color_id,))
-                result = cursor.fetchone()
-                if result is None:
-                    raise ValueError("Failed to fetch the count from the database")
+        with self.connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT COUNT(*) FROM posts WHERE color_id = %s
+            """, (color_id,))
+            result = cursor.fetchone()
+            if result is None:
+                raise ValueError("Failed to fetch the count from the database")
 
-                can_post = result[0] == 0
-                if not can_post:
-                    raise ValueError("This color is already posted")
+            can_post = result[0] == 0
+            if not can_post:
+                raise ValueError("This color is already posted")
 
-                cursor.execute("""
-                    INSERT INTO posts (user_id, color_id, image, posted_time, rank) 
-                    VALUES (%s, %s, %s, %s, %s)
-                """, (user_id, color_id, image_base64, posted_time, rank,))
-
-                self.connection.commit()
-        except Exception as e:
-            self.connection.rollback()  # エラー時にロールバック
-            raise e
-        finally:
-            self.connection.close()
+            cursor.execute("""
+                INSERT INTO posts (user_id, color_id, image, posted_time, rank) 
+                VALUES (%s, %s, %s, %s, %s)
+            """, (user_id, color_id, image_base64, posted_time, rank,))
 
 class ThemeColorResource(object):
     def __init__(self,db_config:DbConfig) ->None:
@@ -275,24 +247,17 @@ class ThemeColorResource(object):
             resp.status = falcon.HTTP_500
 
     def get_user_count(self, room_id):
-        try:
-            with self.connection.cursor() as cursor:
-                cursor.execute(
-                    "SELECT COUNT(*) FROM room_members WHERE room_id = %s",
-                    (room_id,)
-                )
-                result = cursor.fetchall()
-                if len(result) == 0:
-                    raise ValueError("Room not found")
-                if result[0][0] < 2:
-                    raise ValueError("Room has not enough members")
-                self.connection.commit()
-                return result[0][0]
-        except Exception as e:
-            self.connection.rollback()  # エラー時にロールバック
-            raise e
-        finally:
-            self.connection.close()
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT COUNT(*) FROM room_members WHERE room_id = %s",
+                (room_id,)
+            )
+            result = cursor.fetchall()
+            if len(result) == 0:
+                raise ValueError("Room not found")
+            if result[0][0] < 2:
+                raise ValueError("Room has not enough members")
+            return result[0][0]
 
     def get_theme_colors(self, user_count):
         # ランダムでテーマカラーを生成
@@ -312,22 +277,12 @@ class ThemeColorResource(object):
         return theme_colors
 
     def insert_to_db(self, room_id, colors):
-        try:
-            with self.connection.cursor() as cursor:
-                for color in colors:
-                    cursor.execute("""
-                        INSERT INTO room_colors (room_id, color)
-                        VALUES (%s, %s)
-                    """, (room_id, color,))
-
-                self.connection.commit()
-
-        except Exception as e:
-            self.connection.rollback()  # エラー時にロールバック
-            raise e
-
-        finally:
-            self.connection.close()
+        with self.connection.cursor() as cursor:
+            for color in colors:
+                cursor.execute("""
+                    INSERT INTO room_colors (room_id, color)
+                    VALUES (%s, %s)
+                """, (room_id, color,))
 
 app = falcon.App(
     cors_enable=True
