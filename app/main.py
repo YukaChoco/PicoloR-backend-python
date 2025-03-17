@@ -37,8 +37,6 @@ db_config = DbConfig(dbname=dbname, user=user, password=password, host=host, por
 
 class AppResource(object):
     def __init__(self,db_config:DbConfig) ->None:
-        # log出す
-
         self.connection = psycopg2.connect(
             dbname=db_config.dbname,
             user=db_config.user,
@@ -225,27 +223,21 @@ class ThemeColorResource(object):
 
     def on_get(self, req, resp):
         try:
-            raw_json = req.bounded_stream.read()
-            if raw_json is not None and raw_json:
-                # raw_jsonがNoneでなく、かつ空でない場合の処理
-                data = json.loads(raw_json)
-                room_id = data.get("roomID")
+            room_id = req.get_param("roomID")
 
-                if room_id is None:
-                    raise ValueError("Missing required fields")
+            if room_id is None:
+                raise ValueError("Missing required fields")
 
-                user_count = self.get_user_count(room_id)
-                theme_colors = self.get_theme_colors(user_count)
+            user_count = self.get_user_count(room_id)
+            theme_colors = self.get_theme_colors(user_count)
 
-                self.insert_to_db(room_id, theme_colors)
+            self.insert_to_db(room_id, theme_colors)
 
-                # 成功レスポンス
-                resp.media = {
-                    "themeColors": theme_colors
-                }
-                resp.status = falcon.HTTP_200
-            else:
-                raise ValueError("Empty request body")
+            # 成功レスポンス
+            resp.media = {
+                "themeColors": theme_colors
+            }
+            resp.status = falcon.HTTP_200
         except json.JSONDecodeError:
             resp.text = json.dumps({"error": "Invalid JSON"})
             resp.status = falcon.HTTP_400
