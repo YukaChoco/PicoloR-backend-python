@@ -122,7 +122,7 @@ class AppResource(object):
                 return result[0][0]
         except Exception as e:
             self.connection.rollback()  # エラー時にロールバック
-            raise
+            raise e
 
 
     def get_posted_time(self, start_at, posted_at):
@@ -146,7 +146,7 @@ class AppResource(object):
                 return result[0][0]
         except Exception as e:
             self.connection.rollback()  # エラー時にロールバック
-            raise
+            raise e
 
     def hex_to_hue(self, hex_color):
         # 16進数カラーコードをHSVに変換
@@ -204,7 +204,7 @@ class AppResource(object):
                 return next_rank
         except Exception as e:
             self.connection.rollback()  # エラー時にロールバック
-            raise
+            raise e
 
     def insert_to_db(self, user_id, color_id, image_base64, posted_time, rank):
         try:
@@ -228,7 +228,7 @@ class AppResource(object):
                 self.connection.commit()
         except Exception as e:
             self.connection.rollback()  # エラー時にロールバック
-            raise
+            raise e
 
 class ThemeColorResource(object):
     def __init__(self,db_config:DbConfig) ->None:
@@ -282,7 +282,7 @@ class ThemeColorResource(object):
                 return result[0][0]
         except Exception as e:
             self.connection.rollback()  # エラー時にロールバック
-            raise
+            raise e
 
     def get_theme_colors(self, user_count):
         # ランダムでテーマカラーを生成
@@ -314,7 +314,7 @@ class ThemeColorResource(object):
 
         except Exception as e:
             self.connection.rollback()  # エラー時にロールバック
-            raise
+            raise e
 
 app = falcon.App(
     cors_enable=True
