@@ -35,6 +35,18 @@ if not all([dbname, user, password, host, port]):
 
 db_config = DbConfig(dbname=dbname, user=user, password=password, host=host, port=port)
 
+
+class CORSMiddleware:
+    def process_request(self, req, resp):
+        resp.set_header('Access-Control-Allow-Origin', '*')
+        resp.set_header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+        resp.set_header('Access-Control-Allow-Headers', 'Content-Type')
+
+    def process_response(self, req, resp, resource, req_succeeded):
+        resp.set_header('Access-Control-Allow-Origin', '*')
+        resp.set_header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+        resp.set_header('Access-Control-Allow-Headers', 'Content-Type')
+
 class AppResource(object):
     def __init__(self,db_config:DbConfig) ->None:
         self.connection = psycopg2.connect(
@@ -235,13 +247,14 @@ class ThemeColorResource(object):
                 user_count = self.get_user_count(room_id)
                 theme_colors = self.get_theme_colors(user_count)
 
+                self.insert_to_db(room_id, theme_colors)
+
                 # 成功レスポンス
                 resp.media = {
                     "themeColors": theme_colors
                 }
                 resp.status = falcon.HTTP_200
             else:
-                # raw_jsonがNoneまたは空の場合の処理
                 raise ValueError("Empty request body")
         except json.JSONDecodeError:
             resp.text = json.dumps({"error": "Invalid JSON"})
@@ -282,7 +295,17 @@ class ThemeColorResource(object):
             theme_colors.append(hex_color)
         return theme_colors
 
-app = falcon.App()
+    def insert_to_db(self, room_id, colors):
+        with self.connection.cursor() as cursor:
+            for color in colors:
+                cursor.execute("""
+                    INSERT INTO room_colors (room_id, color)
+                    VALUES (%s, %s)
+                """, (room_id, color,))
+
+            self.connection.commit()
+
+app = falcon.App(middleware=[CORSMiddleware()])
 app.add_route("/controller/image", AppResource(db_config))
 app.add_route("/host/theme_color", ThemeColorResource(db_config))
 
