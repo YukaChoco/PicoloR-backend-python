@@ -86,7 +86,7 @@ class AppResource(object):
                 if is_success:
                     can_insert_to_db = self.can_insert_to_db(color_id)
                     if can_insert_to_db:
-                        rank = self.get_rank_for_color_id(color_id)  # rankを取得
+                        rank = self.get_rank(room_id)  # rankを取得
                         self.insert_to_db(user_id, color_id, image_base64, posted_time, rank, room_id)
                         resp.media = {
                             "is_success": True,
@@ -205,24 +205,19 @@ class AppResource(object):
 
         return True
 
-    def get_rank_for_color_id(self, color_id):
+    def get_rank(self, room_id):
         cursor = self.connection.cursor()
         try:
             cursor.execute("""
-                WITH color_count AS (
-                    SELECT COUNT(*) AS count
-                    FROM posts
-                    WHERE color_id = %s
-                )
-                SELECT COALESCE(color_count.count, 0) + 1 AS rank
-                FROM color_count
-            """, (color_id,))
+                SELECT COUNT(*) FROM posts WHERE room_id = %s
+            """, (room_id,))
 
             # rankを取得
             current_winner_count = cursor.fetchone()
             print("current_winner_count",current_winner_count)
             if current_winner_count is None:
                 raise ValueError("Failed to fetch the current winner count from the database")
+            print("current_winner_count[0]",current_winner_count[0])
             next_rank = current_winner_count[0] + 1
             print("next_rank",next_rank)
             return next_rank
@@ -230,7 +225,6 @@ class AppResource(object):
             raise e
         finally:
             cursor.close()
-
 
 
     def can_insert_to_db(self, color_id):
