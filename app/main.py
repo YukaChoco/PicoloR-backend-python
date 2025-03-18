@@ -83,15 +83,22 @@ class AppResource(object):
 
                 # DBにPostgresqlでデータを追加
                 if is_success:
-                    rank = self.get_rank_for_color_id(color_id)  # rankを取得
-                    self.insert_to_db(user_id, color_id, image_base64, posted_time, rank)
-                    resp.media = {
-                        "is_success": True,
-                        "rank": rank
-                    }
+                    can_insert_to_db = self.can_insert_to_db(color_id)
+                    if can_insert_to_db:
+                        rank = self.get_rank_for_color_id(color_id)  # rankを取得
+                        resp.media = {
+                            "is_success": True,
+                            "rank": rank
+                        }
+                    else:
+                        resp.media = {
+                            "is_success": False,
+                            "error": "この色は既に投稿されています！"
+                        }
                 else:
                     resp.media = {
                         "is_success": False,
+                        "error": "画像の色がテーマカラーと一致していません！"
                     }
 
                 # 成功レスポンス
@@ -148,36 +155,36 @@ class AppResource(object):
 
     def check_image_hue(self, image, input_hue):
         # 画像をRGBからHSVに変換
+        print("check_image_hue start")
         image = image.convert('RGB')
         np_image = np.array(image)
         hsv_image = cv2.cvtColor(np_image, cv2.COLOR_RGB2HSV)
 
+
+        print("check_image_hue hsv get")
         # S >= 0.3 かつ V >= 0.3 のピクセルを抽出
         mask = (hsv_image[:,:,1] >= 0.3 * 255) & (hsv_image[:,:,2] >= 0.3 * 255)
         filtered_hues = hsv_image[:,:,0][mask]  # Hueを0-360の範囲に変換
 
+        print("check_image_hue mask get")
+
         # 条件2: ピックアップした画素が全体の15%以上を占めているか
         total_pixels = np_image.shape[0] * np_image.shape[1]
-        print("pixel ratio", len(filtered_hues) / total_pixels)
+        print("[pixel ratio]", len(filtered_hues) / total_pixels)
         if len(filtered_hues) < 0.3 * total_pixels:
             return False
 
         print("input fue", input_hue)
         half_input_hue = np.int32(input_hue / 2)
         filtered_hues = filtered_hues.astype(np.int32)
-        print("half_input_hue", half_input_hue)
-        print("filtered_hues", filtered_hues)
+        # print("half_input_hue", half_input_hue)
+        # print("filtered_hues", filtered_hues)
 
         hue_range_mask = ((filtered_hues >= half_input_hue - 30) & (filtered_hues <= half_input_hue + 30)) | \
                         ((filtered_hues + 180 >= half_input_hue - 30) & (filtered_hues + 180 <= half_input_hue + 30)) | \
                         ((filtered_hues - 180 >= half_input_hue - 30) & (filtered_hues - 180 <= half_input_hue + 30))
-        print("all pixels", total_pixels)
-        print("hue_range_mask", np.sum(hue_range_mask))
-        print("filtered_hues", len(filtered_hues))
-        print("hue ratio", np.sum(hue_range_mask) / len(filtered_hues))
-        print("filtered_hues.dtype",filtered_hues.dtype)
-        print("hue_range_mask values:", hue_range_mask)
-        print("filtered_hues - 180:", filtered_hues - 180)
+        print("all pixels:", total_pixels,", hue_range_mask:", np.sum(hue_range_mask), "filtered_hues:", len(filtered_hues))
+        print("[hue ratio]", np.sum(hue_range_mask) / len(filtered_hues))
         if np.sum(hue_range_mask) < 0.3 * len(filtered_hues):
             return False
 
@@ -204,6 +211,22 @@ class AppResource(object):
             print("next_rank",next_rank)
             return next_rank
 
+
+    def can_insert_to_db(self, color_id):
+        with self.connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT COUNT(*) FROM posts WHERE color_id = %s
+            """, (color_id,))
+            result = cursor.fetchone()
+            if result is None:
+                raise ValueError("Failed to fetch the count from the database")
+
+            can_post = result[0] == 0
+            if not can_post:
+                return False
+
+            return True
+
     def insert_to_db(self, user_id, color_id, image_base64, posted_time, rank):
         with self.connection.cursor() as cursor:
             try:
@@ -218,10 +241,20 @@ class AppResource(object):
                 if not can_post:
                     raise ValueError("This color is already posted")
 
+                insertData = (user_id, color_id, "image_base64", posted_time, rank)
+                print("insertData",insertData)
+                
                 cursor.execute("""
-                    INSERT INTO posts (user_id, color_id, image, posted_time, rank) 
+                    INSERT INTO posts (user_id, color_id, image, posted_time, rank)
                     VALUES (%s, %s, %s, %s, %s)
                 """, (user_id, color_id, image_base64, posted_time, rank,))
+                
+                # cursor.execute("""
+                #     INSERT INTO posts (user_id, color_id, image, posted_time, rank) 
+                #     VALUES (9997, 67, 'test', '0:00', 1)
+                # """)
+                
+                self.connection.commit()
             except Exception as e:
                 self.connection.rollback()
                 raise e
