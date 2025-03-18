@@ -284,16 +284,26 @@ class ThemeColorResource(object):
             if room_id_int is None:
                 raise ValueError("Missing required fields")
 
-            user_count = self.get_user_count(room_id_int)
-            theme_colors = self.get_theme_colors(user_count)
+            res = self.get_user_count(room_id_int)
 
-            self.insert_to_db(room_id_int, theme_colors)
+            if res["is_success"]:
+                user_count = res["user_count"]
 
-            # 成功レスポンス
-            resp.media = {
-                "themeColors": theme_colors
-            }
-            resp.status = falcon.HTTP_200
+                theme_colors = self.get_theme_colors(user_count)
+
+                self.insert_to_db(room_id_int, theme_colors)
+
+                # 成功レスポンス
+                resp.media = {
+                    "themeColors": theme_colors
+                }
+                resp.status = falcon.HTTP_200
+            else:
+                resp.media = {
+                    "error": res["error"]
+                }
+                resp.status = falcon.HTTP_400
+
         except json.JSONDecodeError:
             resp.text = json.dumps({"error": "Invalid JSON"})
             resp.status = falcon.HTTP_400
@@ -306,16 +316,38 @@ class ThemeColorResource(object):
     def get_user_count(self, room_id):
         cursor = self.connection.cursor()
         try:
+            # room_idが存在するか確認
+            cursor.execute(
+                "SELECT id FROM rooms WHERE id = %s",
+                (room_id,)
+            )
+            result = cursor.fetchall()
+            if len(result) == 0:
+                return {
+                    "is_success": False,
+                    "error": "Room not found"
+                }
+
             cursor.execute(
                 "SELECT COUNT(*) FROM room_members WHERE room_id = %s",
                 (room_id,)
             )
             result = cursor.fetchall()
-            if len(result) == 0:
-                raise ValueError("Room not found")
-            if result[0][0] < 2:
-                raise ValueError("Room has not enough members")
-            return result[0][0]
+            if len(result) == 0 or result[0][0] is None:
+                return {
+                    "is_success": False,
+                    "error": "Room has not enough members"
+                }
+            user_count = result[0][0]
+            if user_count < 2:
+                return {
+                    "is_success": False,
+                    "error": "Room has not enough members"
+                    }
+            return {
+                "is_success": True,
+                "user_count": user_count
+            }
         except Exception as e:
             raise e
         finally:
