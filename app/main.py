@@ -228,7 +228,7 @@ class AppResource(object):
                 VALUES (%s, %s, %s, %s, %s)
             """, (user_id, color_id, image_base64, posted_time, rank,))
             print("インサート完了")
-            self.connection.commit()
+            # self.connection.commit()
 
 class ThemeColorResource(object):
     def __init__(self,db_config:DbConfig) ->None:
@@ -301,15 +301,24 @@ class ThemeColorResource(object):
     def insert_to_db(self, room_id, colors):
         with self.connection.cursor() as cursor:
             for color in colors:
-                try:
-                    cursor.execute("""
-                        INSERT INTO room_colors (room_id, color)
-                        VALUES (%s, %s)
-                    """, (room_id, color,))
-                    self.connection.commit()
-                except psycopg2.IntegrityError:
-                    self.connection.rollback()
-                    continue
+                cursor.execute("""
+                    INSERT INTO room_colors (room_id, color)
+                    VALUES (%s, %s)
+                """, (room_id, color,))
+
+        # with self.connection.cursor() as cursor:
+        #     insertData = []
+        #     for color in colors:
+        #         insertData.append((room_id, color))
+
+        #     try:
+        #         cursor.execute("""
+        #             INSERT INTO room_colors (room_id, color)
+        #             VALUES (%s, %s), ( , ), ( , )...
+        #         """, (room_id, color,))
+        #         self.connection.commit()
+        #     except psycopg2.IntegrityError:
+        #         self.connection.rollback()
 
 app = falcon.App(
     cors_enable=True
