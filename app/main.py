@@ -62,7 +62,7 @@ class AppResource(object):
 
                 # 日本時間の現在時間を取得(日本時間)
                 posted_at = datetime.datetime.now()
-                start_at = self.get_start_at(color_id)
+                start_at = self.get_start_at(room_id)
 
                 # 結果をテキストとしてフォーマット
                 posted_time = self.get_posted_time(start_at, posted_at)
@@ -124,7 +124,9 @@ class AppResource(object):
                 "SELECT start_at FROM rooms WHERE id = %s",
                 (room_id,)
             )
+            print("room_id",room_id)
             result = cursor.fetchall()
+            print("result",result)
             if len(result) == 0:
                 raise ValueError("Room not found")
             if result[0][0] is None:
