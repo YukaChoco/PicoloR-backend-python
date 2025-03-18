@@ -117,7 +117,8 @@ class AppResource(object):
             resp.status = falcon.HTTP_500
 
     def get_start_at(self, color_id):
-        with self.connection.cursor() as cursor:
+        cursor = self.connection.cursor()
+        try:
             cursor.execute(
                 "SELECT start_at FROM room_colors INNER JOIN rooms ON room_colors.room_id = rooms.id WHERE room_colors.id = %s",
                 (color_id,)
@@ -128,6 +129,10 @@ class AppResource(object):
             if result[0][0] is None:
                 raise ValueError("Room has not started yet")
             return result[0][0]
+        except Exception as e:
+            raise e
+        finally:
+            cursor.close()
 
 
     def get_posted_time(self, start_at, posted_at):
@@ -138,7 +143,8 @@ class AppResource(object):
         return f"{minutes}:{seconds:02d}"
 
     def get_theme_color(self, color_id):
-        with self.connection.cursor() as cursor:
+        cursor = self.connection.cursor()
+        try:
             cursor.execute(
                 "SELECT color FROM room_colors WHERE id = %s",
                 (color_id,)
@@ -147,6 +153,11 @@ class AppResource(object):
             if len(result) == 0:
                 raise ValueError("Color not found")
             return result[0][0]
+        except Exception as e:
+            raise e
+        finally:
+            cursor.close()
+
 
     def hex_to_hue(self, hex_color):
         # 16進数カラーコードをHSVに変換
@@ -192,7 +203,8 @@ class AppResource(object):
         return True
 
     def get_rank_for_color_id(self, color_id):
-        with self.connection.cursor() as cursor:
+        cursor = self.connection.cursor()
+        try:
             cursor.execute("""
                 WITH color_count AS (
                     SELECT COUNT(*) AS count
@@ -211,10 +223,16 @@ class AppResource(object):
             next_rank = current_winner_count[0] + 1
             print("next_rank",next_rank)
             return next_rank
+        except Exception as e:
+            raise e
+        finally:
+            cursor.close()
+
 
 
     def can_insert_to_db(self, color_id):
-        with self.connection.cursor() as cursor:
+        cursor = self.connection.cursor()
+        try:
             cursor.execute("""
                 SELECT COUNT(*) FROM posts WHERE color_id = %s
             """, (color_id,))
@@ -227,18 +245,26 @@ class AppResource(object):
                 return False
 
             return True
+        except Exception as e:
+            raise e
+        finally:
+            cursor.close()
+
 
     def insert_to_db(self, user_id, color_id, image_base64, posted_time, rank):
-        with self.connection.cursor() as cursor:
-            try:
-                cursor.execute("""
-                    INSERT INTO posts (user_id, color_id, image, posted_time, rank)
-                    VALUES (%s, %s, %s, %s, %s)
-                """, (user_id, color_id, image_base64, posted_time, rank,))
-                self.connection.commit()
-            except Exception as e:
-                self.connection.rollback()
-                raise e
+        cursor = self.connection.cursor()
+        try:
+            cursor.execute("""
+                INSERT INTO posts (user_id, color_id, image, posted_time, rank)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (user_id, color_id, image_base64, posted_time, rank,))
+            self.connection.commit()
+        except Exception as e:
+            self.connection.rollback()
+            raise e
+        finally:
+            cursor.close()
+
 
 class ThemeColorResource(object):
     def __init__(self,db_config:DbConfig) ->None:
@@ -278,7 +304,8 @@ class ThemeColorResource(object):
             resp.status = falcon.HTTP_500
 
     def get_user_count(self, room_id):
-        with self.connection.cursor() as cursor:
+        cursor = self.connection.cursor()
+        try:
             cursor.execute(
                 "SELECT COUNT(*) FROM room_members WHERE room_id = %s",
                 (room_id,)
@@ -289,6 +316,11 @@ class ThemeColorResource(object):
             if result[0][0] < 2:
                 raise ValueError("Room has not enough members")
             return result[0][0]
+        except Exception as e:
+            raise e
+        finally:
+            cursor.close()
+
 
     def get_theme_colors(self, user_count):
         # ランダムでテーマカラーを生成
@@ -308,7 +340,8 @@ class ThemeColorResource(object):
         return theme_colors
 
     def insert_to_db(self, room_id_int, colors):
-        with self.connection.cursor() as cursor:
+        cursor = self.connection.cursor()
+        try:
             insertData = []
             for color in colors:
                 insertData.append((room_id_int, color))
@@ -326,6 +359,10 @@ class ThemeColorResource(object):
             except Exception as e:
                 self.connection.rollback()
                 raise e
+        except Exception as e:
+            raise e
+        finally:
+            cursor.close()
 
 app = falcon.App(
     cors_enable=True
