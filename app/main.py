@@ -206,29 +206,21 @@ class AppResource(object):
 
     def insert_to_db(self, user_id, color_id, image_base64, posted_time, rank):
         with self.connection.cursor() as cursor:
-            print("start insert_to_db")
             cursor.execute("""
                 SELECT COUNT(*) FROM posts WHERE color_id = %s
             """, (color_id,))
             result = cursor.fetchone()
-            print("result",result)
             if result is None:
                 raise ValueError("Failed to fetch the count from the database")
 
             can_post = result[0] == 0
-            print("can_post",can_post)
             if not can_post:
                 raise ValueError("This color is already posted")
 
-        with self.connection.cursor() as cursor:
-            print("今からインサート")
-            print("color_id type",type(color_id))
             cursor.execute("""
-                INSERT INTO posts (user_id, color_id, image, posted_time, rank)
+                INSERT INTO posts (user_id, color_id, image, posted_time, rank) 
                 VALUES (%s, %s, %s, %s, %s)
             """, (user_id, color_id, image_base64, posted_time, rank,))
-            print("インサート完了")
-            # self.connection.commit()
 
 class ThemeColorResource(object):
     def __init__(self,db_config:DbConfig) ->None:
@@ -250,9 +242,7 @@ class ThemeColorResource(object):
             user_count = self.get_user_count(room_id)
             theme_colors = self.get_theme_colors(user_count)
 
-            print("theme_colors", theme_colors)
             self.insert_to_db(room_id, theme_colors)
-            print("inserted to db")
 
             # 成功レスポンス
             resp.media = {
@@ -300,25 +290,17 @@ class ThemeColorResource(object):
 
     def insert_to_db(self, room_id, colors):
         with self.connection.cursor() as cursor:
-            for color in colors:
+            # for color in colors:
+            try:
+                print("今からinsertします")
                 cursor.execute("""
-                    INSERT INTO room_colors (room_id, color)
-                    VALUES (%s, %s)
-                """, (room_id, color,))
-
-        # with self.connection.cursor() as cursor:
-        #     insertData = []
-        #     for color in colors:
-        #         insertData.append((room_id, color))
-
-        #     try:
-        #         cursor.execute("""
-        #             INSERT INTO room_colors (room_id, color)
-        #             VALUES (%s, %s), ( , ), ( , )...
-        #         """, (room_id, color,))
-        #         self.connection.commit()
-        #     except psycopg2.IntegrityError:
-        #         self.connection.rollback()
+                        INSERT INTO room_colors (room_id, color)
+                        VALUES (999, '#sqlsql')
+                    """)
+                print("insertしました")
+                self.connection.commit()
+            except Exception as e:
+                self.connection.rollback()
 
 app = falcon.App(
     cors_enable=True
