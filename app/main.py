@@ -54,9 +54,10 @@ class AppResource(object):
                 data = json.loads(raw_json)
                 user_id = data.get("userID")
                 color_id = data.get("colorID")
+                room_id = data.get("roomID")
                 image_base64 = data.get("image")
 
-                if user_id is None or color_id is None or image_base64 is None:
+                if user_id is None or color_id is None or room_id is None or image_base64 is None:
                     raise ValueError("Missing required fields")
 
                 # 日本時間の現在時間を取得(日本時間)
@@ -86,7 +87,7 @@ class AppResource(object):
                     can_insert_to_db = self.can_insert_to_db(color_id)
                     if can_insert_to_db:
                         rank = self.get_rank_for_color_id(color_id)  # rankを取得
-                        self.insert_to_db(user_id, color_id, image_base64, posted_time, rank)
+                        self.insert_to_db(user_id, color_id, image_base64, posted_time, rank, room_id)
                         resp.media = {
                             "is_success": True,
                             "rank": rank
@@ -116,12 +117,12 @@ class AppResource(object):
             resp.text = json.dumps({"error": str(e)})
             resp.status = falcon.HTTP_500
 
-    def get_start_at(self, color_id):
+    def get_start_at(self, room_id):
         cursor = self.connection.cursor()
         try:
             cursor.execute(
-                "SELECT start_at FROM room_colors INNER JOIN rooms ON room_colors.room_id = rooms.id WHERE room_colors.id = %s",
-                (color_id,)
+                "SELECT start_at FROM rooms WHERE id = %s",
+                (room_id,)
             )
             result = cursor.fetchall()
             if len(result) == 0:
@@ -251,13 +252,13 @@ class AppResource(object):
             cursor.close()
 
 
-    def insert_to_db(self, user_id, color_id, image_base64, posted_time, rank):
+    def insert_to_db(self, user_id, color_id, image_base64, posted_time, rank, room_id):
         cursor = self.connection.cursor()
         try:
             cursor.execute("""
-                INSERT INTO posts (user_id, color_id, image, posted_time, rank)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (user_id, color_id, image_base64, posted_time, rank,))
+                INSERT INTO posts (user_id, color_id, image, posted_time, rank, room_id)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (user_id, color_id, image_base64, posted_time, rank, room_id,))
             self.connection.commit()
         except Exception as e:
             self.connection.rollback()
