@@ -76,6 +76,8 @@ class AppResource(object):
                 # 入力カラーコードをHSV空間に変換し、Hueを取り出す
                 input_hue = self.hex_to_hue(color)
 
+                print("input_hue", input_hue)
+
                 # 画像をHSV空間に変換し、条件を満たすピクセルのHueの平均値を計算
                 is_success = self.check_image_hue(image, input_hue)
 
@@ -157,16 +159,26 @@ class AppResource(object):
         # 条件2: ピックアップした画素が全体の15%以上を占めているか
         total_pixels = np_image.shape[0] * np_image.shape[1]
         print("pixel ratio", len(filtered_hues) / total_pixels)
-        if len(filtered_hues) < 0.15 * total_pixels:
+        if len(filtered_hues) < 0.3 * total_pixels:
             return False
 
-        # 条件1: ピックアップした画素のうちHueが前後20の範囲にあるものの占有率を調べ、70%以上であること
-        input_hue = input_hue / 2  # OpenCVのHueは0-180の範囲
-        hue_range_mask = ((filtered_hues >= input_hue - 10) & (filtered_hues <= input_hue + 10)) | \
-                        ((filtered_hues + 180 >= input_hue - 10) & (filtered_hues + 180 <= input_hue + 10)) | \
-                        ((filtered_hues - 180 >= input_hue - 10) & (filtered_hues - 180 <= input_hue + 10))
+        print("input fue", input_hue)
+        half_input_hue = np.int32(input_hue / 2)
+        filtered_hues = filtered_hues.astype(np.int32)
+        print("half_input_hue", half_input_hue)
+        print("filtered_hues", filtered_hues)
+
+        hue_range_mask = ((filtered_hues >= half_input_hue - 30) & (filtered_hues <= half_input_hue + 30)) | \
+                        ((filtered_hues + 180 >= half_input_hue - 30) & (filtered_hues + 180 <= half_input_hue + 30)) | \
+                        ((filtered_hues - 180 >= half_input_hue - 30) & (filtered_hues - 180 <= half_input_hue + 30))
+        print("all pixels", total_pixels)
+        print("hue_range_mask", np.sum(hue_range_mask))
+        print("filtered_hues", len(filtered_hues))
         print("hue ratio", np.sum(hue_range_mask) / len(filtered_hues))
-        if np.sum(hue_range_mask) < 0.4 * len(filtered_hues):
+        print("filtered_hues.dtype",filtered_hues.dtype)
+        print("hue_range_mask values:", hue_range_mask)
+        print("filtered_hues - 180:", filtered_hues - 180)
+        if np.sum(hue_range_mask) < 0.3 * len(filtered_hues):
             return False
 
         return True
