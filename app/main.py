@@ -224,7 +224,7 @@ class AppResource(object):
             print("今からインサート")
             print("color_id type",type(color_id))
             cursor.execute("""
-                INSERT INTO results (user_id, color_id, image, posted_time, rank)
+                INSERT INTO posts (user_id, color_id, image, posted_time, rank)
                 VALUES (%s, %s, %s, %s, %s)
             """, (user_id, color_id, image_base64, posted_time, rank,))
             print("インサート完了")
@@ -303,7 +303,7 @@ class ThemeColorResource(object):
             for color in colors:
                 try:
                     cursor.execute("""
-                        INSERT INTO colors (room_id, color)
+                        INSERT INTO room_colors (room_id, color)
                         VALUES (%s, %s)
                     """, (room_id, color,))
                     self.connection.commit()
