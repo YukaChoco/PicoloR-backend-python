@@ -86,6 +86,7 @@ class AppResource(object):
                     can_insert_to_db = self.can_insert_to_db(color_id)
                     if can_insert_to_db:
                         rank = self.get_rank_for_color_id(color_id)  # rankを取得
+                        self.insert_to_db(user_id, color_id, image_base64, posted_time, rank)
                         resp.media = {
                             "is_success": True,
                             "rank": rank
@@ -231,34 +232,11 @@ class AppResource(object):
         with self.connection.cursor() as cursor:
             try:
                 cursor.execute("""
-                    SELECT COUNT(*) FROM posts WHERE color_id = %s
-                """, (color_id,))
-                result = cursor.fetchone()
-                if result is None:
-                    raise ValueError("Failed to fetch the count from the database")
-
-                can_post = result[0] == 0
-                if not can_post:
-                    raise ValueError("This color is already posted")
-
-                insertData = (user_id, color_id, "image_base64", posted_time, rank)
-                print("insertData",insertData)
-                
-                cursor.execute("""
                     INSERT INTO posts (user_id, color_id, image, posted_time, rank)
                     VALUES (%s, %s, %s, %s, %s)
                 """, (user_id, color_id, image_base64, posted_time, rank,))
-                
-                # cursor.execute("""
-                #     INSERT INTO posts (user_id, color_id, image, posted_time, rank) 
-                #     VALUES (9997, 67, 'test', '0:00', 1)
-                # """)
-                
                 self.connection.commit()
             except Exception as e:
-                self.connection.rollback()
-                raise e
-            except ValueError as e:
                 self.connection.rollback()
                 raise e
 
